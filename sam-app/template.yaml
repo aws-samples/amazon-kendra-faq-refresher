@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  SAM template for automated-kendra-faq-refresher
+  SAM template for amazon-kendra-faq-refresher
 
 Parameters:
   BucketNamePrefix:
