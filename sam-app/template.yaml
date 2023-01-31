@@ -1,0 +1,276 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM template for automated-kendra-faq-refresher
+
+Parameters:
+  BucketNamePrefix:
+    Description: S3 Bucket name
+    Type: String
+    Default: kendra-faq
+
+  EmailAddress:
+    Type: String
+    Description: Email that receives notifications when FAQs have been successfully added
+
+Resources:
+
+  FAQBucket:
+    DependsOn: BucketPermission
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ['-', [!Ref BucketNamePrefix, !Select [2, !Split ['/', !Ref AWS::StackId]]]]
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .json
+            Function: !GetAtt FAQRefresherLambda.Arn
+          - Event: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .csv
+            Function: !GetAtt FAQRefresherLambda.Arn
+          - Event: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .JSON
+            Function: !GetAtt FAQRefresherLambda.Arn
+          - Event: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .CSV
+            Function: !GetAtt FAQRefresherLambda.Arn
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: S3 Access Logging is not required if you are putting sensitive data, you better enable access logging
+
+  FAQBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FAQBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowSSLRequestsOnly
+            Action:
+              - s3:*
+            Effect: Deny
+            Resource:
+              - !Join ['-', [!Sub 'arn:${AWS::Partition}:s3:::${BucketNamePrefix}', !Select [2, !Split ['/', !Ref AWS::StackId]]]]
+              - !Join ['/', [!Join ['-', [!Sub 'arn:${AWS::Partition}:s3:::${BucketNamePrefix}', !Select [2, !Split ['/', !Ref AWS::StackId]]]], '*']]
+            Principal: '*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+
+  BucketPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref FAQRefresherLambda
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Join ['-', [!Sub 'arn:${AWS::Partition}:s3:::${BucketNamePrefix}', !Select [2, !Split ['/', !Ref AWS::StackId]]]]
+
+  FAQRefresherLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/kendra-faq-refresher-lambda
+      RetentionInDays: 60
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W84
+            reason: The data stored in CloudWatch Logs does not contain sensitive information, using default protections provided by CloudWatch logs
+
+  FAQRefresherLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: KendraFaqRefresherLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !GetAtt FAQRefresherLambdaLogGroup.Arn
+              - Effect: Allow
+                Action:
+                  - kendra:CreateFaq
+                  - kendra:DeleteFaq
+                  - kendra:ListFaqs
+                Resource:
+                  - !Sub arn:${AWS::Partition}:kendra:${AWS::Region}:${AWS::AccountId}:index/*
+              - Effect: Allow
+                Action:
+                  - kendra:DescribeFaq
+                Resource:
+                  - !Sub arn:${AWS::Partition}:kendra:${AWS::Region}:${AWS::AccountId}:index/*
+                  - !Sub arn:${AWS::Partition}:kendra:${AWS::Region}:${AWS::AccountId}:index/*/faq/*"
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource:
+                  - !GetAtt FAQCreationRole.Arn
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref NotificationTopic
+
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+      - Endpoint: !Ref EmailAddress
+        Protocol: email
+      KmsMasterKeyId: alias/aws/sns
+
+  FAQRefresherLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: kendra-faq-refresher-lambda
+      Description: Lambda function to create/Delete Kendra FAQ
+      Role: !GetAtt FAQRefresherLambdaExecutionRole.Arn
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      CodeUri: ../src
+      Environment:
+        Variables:
+          FAQ_BUCKET: !Join ['-', [!Ref BucketNamePrefix, !Select [2, !Split ['/', !Ref AWS::StackId]]]]
+          KENDRA_FAQ_ROLE: !GetAtt FAQCreationRole.Arn
+          SNS_TOPIC_ARN: !Ref NotificationTopic
+      Timeout: 300
+      MemorySize: 128
+      Tracing: Active
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPython:7
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: CloudWatch Log Group is created by CloudFormation and Lambda Function does not require logs:CreateLogGroup action
+          - id: W89
+            reason: This lambda function does not require configuration with VPC
+          - id: W92
+            reason: This lambda function does not require ReservedConcurrentExecutions
+
+  FAQCreationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: kendra.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: S3GetObjectPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Join ['/', [!Join ['-', [!Sub 'arn:${AWS::Partition}:s3:::${BucketNamePrefix}', !Select [2, !Split ['/', !Ref AWS::StackId]]]], '*']]
+
+  SampleKendraIndex:
+    Type: AWS::Kendra::Index
+    Properties:
+      Description: Sample Kendra Index
+      Edition: DEVELOPER_EDITION
+      Name: sample-kendra-index
+      RoleArn: !GetAtt SampleKendraIndexServiceRole.Arn
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W80
+            reason: Amazon Kendra will encrypt your data with Amazon Kendra owned key by default
+
+  SampleKendraIndexServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: kendra.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: KendraIndexPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+                Condition:
+                    StringEquals:
+                      cloudwatch:namespace: AWS/Kendra
+              - Effect: Allow
+                Action:
+                  - logs:DescribeLogGroups
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/kendra/*
+              - Effect: Allow
+                Action:
+                  - logs:DescribeLogStreams
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/kendra/*:log-stream:*
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: PutMetricData is limited to AWS/Kendra namespace
+
+Outputs:
+  KendraIndex:
+    Description: Kendra Index
+    Value: !GetAtt SampleKendraIndex.Id
+  S3Bucket:
+    Description: S3 Bucket that stores FAQ documents
+    Value: !Ref FAQBucket
