@@ -1,4 +1,4 @@
-# Automated Kendra FAQ Refresher
+# Amazon Kendra FAQ Refresher
 Amazon Kendra is an intelligent search service powered by machine learning (ML). Kendra
 reimagines enterprise search for your websites and applications so your employees and
 customers can easily find the content they’re looking for, even when it’s scattered across
