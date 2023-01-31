@@ -25,7 +25,7 @@ searching.
 
 ### Deployment Steps using CloudFormation Stack
 
-The template that deploys the solution can be found at [template.yaml](./template.yaml).
+The template that deploys the solution can be found at [template.yaml](./template.yml).
 
 If you're using the AWS Console, follow the instructions at [AWS CloudFormation documentation: Creating a stack on the AWS CloudFormation console](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html).
 
