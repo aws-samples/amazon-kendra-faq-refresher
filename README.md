@@ -59,7 +59,7 @@ The template that deploys the solution can be found at [template.yaml](./sam-app
 
 - clone repository `git clone <repo-url>`
 - on your terminal
-  - `cd automated-kendra-faq-refresher/sam-app`
+  - `cd amazon-kendra-faq-refresher/sam-app`
   - `sam build`
   - `sam deploy --guided`
 ```
