@@ -65,7 +65,7 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W35
-            reason: S3 Access Logging is not required if you are putting sensitive data, you better enable access logging
+            reason: S3 access logging is not required since no sensitive faqs are used for this blog
 
   FAQBucketPolicy:
     Type: AWS::S3::BucketPolicy
