@@ -19,11 +19,15 @@ searching.
 
 - __AWS SAM CLI__(if using SAM CLI to deploy stack, else Skip this step)
   - [Installing the AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
-- __Configuring the AWS CLI__ 
+- __Configuring the AWS CLI__
   - Set up your AWS following the [Guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
 ---
 
-### Deployment Steps using CloudFormation Stack
+### Deployment Steps
+
+We provide 2 sets of deployment instructions depending on the method of deployment. Choose either [Deployment Steps using CloudFormation Stack](#deployment-steps-using-cloudformation-stack) or [Deployment Steps using SAM Template](#deployment-steps-using-sam-template).
+
+#### Deployment Steps using CloudFormation Stack
 
 The template that deploys the solution can be found at [template.yaml](./template.yml).
 
@@ -42,18 +46,9 @@ aws cloudformation deploy \
   --stack-name kendra-faq-refresher \
   --parameter-overrides EmailAddress=example1@example.com --capabilities CAPABILITY_NAMED_IAM --region us-east-1
 ```
-#### Cleanup Step 
 
-- Empty the S3 bucket that was created by the CloudFormation stack and used to contain the
-FAQ documents. For instructions, refer to AWS S3 documentation: [Emptying a bucket.](https://docs.aws.amazon.com/AmazonS3/latest/userguide/empty-bucket.html)
-
-- Delete the CloudFormation stack. For instructions, refer to [Deleting a stack on the AWS
-CloudFormation console.](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-delete-stack.html)
-
-- If you are using AWS CLI, you can use `aws cloudformation delete-stack --stack-name kendra-faq-refresher --region <YOUR_TARGET_REGION>`
-  - example : `aws cloudformation delete-stack --stack-name kendra-faq-refresher --region us-east-1`
 ---
-### Deployment Steps using SAM Template
+#### Deployment Steps using SAM Template
 
 The template that deploys the solution can be found at [template.yaml](./sam-app/template.yaml).
 
@@ -65,7 +60,7 @@ The template that deploys the solution can be found at [template.yaml](./sam-app
 ```
 Setting default arguments for 'sam deploy'
 	=========================================
-	Stack Name [sam-app]: kendra-faq-refresher 
+	Stack Name [sam-app]: kendra-faq-refresher
 	AWS Region [us-east-1]: us-east-1
 	Parameter BucketNamePrefix [kendra-faq]: kendra-faq
 	Parameter EmailAddress []: foobar@foobar.co.uk
@@ -75,16 +70,36 @@ Setting default arguments for 'sam deploy'
 	Allow SAM CLI IAM role creation [Y/n]: y
 	#Preserves the state of previously provisioned resources when an operation fails
 	Disable rollback [y/N]: N
-	Save arguments to configuration file [Y/n]: n 
+	Save arguments to configuration file [Y/n]: n
 ```
-#### Cleanup Step 
+
+----
+### Sample Amazon Kendra FAQ
+
+Three sample Amazon Kendra FAQ files of format `json`, `csv` and `csv faq with header` are being stored [here](./Tests)
+
+----
+### Testing the solution
+
+Follow the instructions at [the blog page](https://aws.amazon.com/blogs/machine-learning/automate-and-implement-version-control-for-amazon-kendra-faqs/) to test the solution.
+
+### Cleanup Steps
+
+- Empty the S3 bucket that was created by the CloudFormation stack and used to contain the
+FAQ documents. For instructions, refer to AWS S3 documentation: [Emptying a bucket.](https://docs.aws.amazon.com/AmazonS3/latest/userguide/empty-bucket.html)
+- Depending on the method of deployment. Choose either [Cleanup Steps using CloudFormation](#cleanup-steps-using-cloudformation) or [Cleanup Steps using SAM](#cleanup-steps-using-sam).
+
+#### Cleanup Steps using CloudFormation
+
+- Delete the CloudFormation stack. For instructions, refer to [Deleting a stack on the AWS
+CloudFormation console.](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-delete-stack.html)
+
+- If you are using AWS CLI, you can use `aws cloudformation delete-stack --stack-name kendra-faq-refresher --region <YOUR_TARGET_REGION>`
+  - example : `aws cloudformation delete-stack --stack-name kendra-faq-refresher --region us-east-1`
+
+#### Cleanup Steps using SAM
 
 - Empty the S3 bucket that was created by the CloudFormation stack and used to contain the
 FAQ documents. For instructions, refer to AWS S3 documentation: [Emptying a bucket.](https://docs.aws.amazon.com/AmazonS3/latest/userguide/empty-bucket.html)
 
 - `sam delete --stack-name kendra-faq-refresher --region us-east-1`
-
-----
-#### Sample Amazon Kendra FAQ
-
-Three sample Amazon Kendra FAQ files of format `json`, `csv` and `csv faq with header` are being stored [here](./Tests) 
